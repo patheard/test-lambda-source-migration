@@ -4,7 +4,7 @@ Test migrating a Lambda function from being managed directly by a `.zip` file to
 This uses the Submission function from [cds-snc/forms-terraform](https://github.com/cds-snc/forms-terraform) as the test function code.
 
 ## Tests
-### 1. v1.0 to v2.0 (no state migration)
+### :test_tube: v1.0 to v2.0 (no state migration)
 ```bash
 git checkout v1.0 # Lambda function managed using .zip
 terraform init
@@ -172,7 +172,7 @@ aws_lambda_function.submission: Modifications complete after 12s [id=Submission]
 Apply complete! Resources: 6 added, 1 changed, 1 destroyed.
 ```
 
-### 2. v1.0 to v3.0 (state migration)
+### :test_tube: v1.0 to v3.0 (state migration)
 ```bash
 git checkout v1.0 # Lambda function managed using .zip
 terraform init
