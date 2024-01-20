@@ -4,6 +4,7 @@ Test migrating a Lambda function from being managed directly by a `.zip` file to
 This uses the Submission function from [cds-snc/forms-terraform](https://github.com/cds-snc/forms-terraform) as the test function code.
 
 ## Tests
+### 1. v1.0 to v2.0 (no state migration)
 ```bash
 git checkout v1.0 # Lambda function managed using .zip
 terraform init
@@ -13,7 +14,8 @@ git checkout v2.0 # Lambda function managed using .zip in S3 bucket
 terraform apply
 ```
 
-## Terraform v2.0 changes
+Result was a 12s update-in-place of the Submission lambda:
+
 ```terraform
 Terraform will perform the following actions:
 
@@ -168,4 +170,114 @@ aws_lambda_function.submission: Still modifying... [id=Submission, 10s elapsed]
 aws_lambda_function.submission: Modifications complete after 12s [id=Submission]
 
 Apply complete! Resources: 6 added, 1 changed, 1 destroyed.
+```
+
+### 2. v1.0 to v3.0 (state migration)
+```bash
+git checkout v1.0 # Lambda function managed using .zip
+terraform init
+terraform apply
+
+git checkout v3.0 # Lambda function managed using .zip in S3 bucket, new state
+cd ./terraform
+terraform init
+terraform apply -target=aws_s3_bucket.lambda_code # bootstrap creation of new state
+./migrate.sh # migrate resources from old state to new state
+terraform apply
+```
+
+Result was an 11s update-in-place of the Submission lambda:
+
+```terraform
+Terraform will perform the following actions:
+
+  # aws_lambda_function.submission will be updated in-place
+  ~ resource "aws_lambda_function" "submission" {
+      - filename                       = "/tmp/submission_main.zip" -> null
+        id                             = "Submission"
+      ~ last_modified                  = "2024-01-20T17:42:01.871+0000" -> (known after apply)
+      ~ layers                         = [
+          - "arn:aws:lambda:ca-central-1:571510889204:layer:submission_node_packages:2",
+        ]
+      + s3_bucket                      = "test-forms-terraform-lambda-code"
+      + s3_key                         = "submission_code"
+      + s3_object_version              = (known after apply)
+      ~ source_code_hash               = "q/+pOrWiAE/H9/h9VmzMyUx9E0075hNNF6JI6diB34w=" -> "JsLrfuaaGTY5XHJLVGFMYJPwzqBqZqg+dmulhvL8YRQ="
+        tags                           = {}
+        # (18 unchanged attributes hidden)
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_s3_bucket_ownership_controls.lambda_code will be created
+  + resource "aws_s3_bucket_ownership_controls" "lambda_code" {
+      + bucket = "test-forms-terraform-lambda-code"
+      + id     = (known after apply)
+
+      + rule {
+          + object_ownership = "BucketOwnerEnforced"
+        }
+    }
+
+  # aws_s3_bucket_public_access_block.lambda_code will be created
+  + resource "aws_s3_bucket_public_access_block" "lambda_code" {
+      + block_public_acls       = true
+      + block_public_policy     = true
+      + bucket                  = "test-forms-terraform-lambda-code"
+      + id                      = (known after apply)
+      + ignore_public_acls      = true
+      + restrict_public_buckets = true
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.lambda_code will be created
+  + resource "aws_s3_bucket_server_side_encryption_configuration" "lambda_code" {
+      + bucket = "test-forms-terraform-lambda-code"
+      + id     = (known after apply)
+
+      + rule {
+          + apply_server_side_encryption_by_default {
+              + sse_algorithm = "AES256"
+            }
+        }
+    }
+
+  # aws_s3_bucket_versioning.lambda_code will be created
+  + resource "aws_s3_bucket_versioning" "lambda_code" {
+      + bucket = "test-forms-terraform-lambda-code"
+      + id     = (known after apply)
+
+      + versioning_configuration {
+          + mfa_delete = (known after apply)
+          + status     = "Enabled"
+        }
+    }
+
+  # aws_s3_object.submission_code will be created
+  + resource "aws_s3_object" "submission_code" {
+      + acl                    = (known after apply)
+      + bucket                 = "test-forms-terraform-lambda-code"
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = (known after apply)
+      + etag                   = (known after apply)
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "submission_code"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "/tmp/submission_code.zip"
+      + source_hash            = "JsLrfuaaGTY5XHJLVGFMYJPwzqBqZqg+dmulhvL8YRQ="
+      + storage_class          = (known after apply)
+      + tags_all               = (known after apply)
+      + version_id             = (known after apply)
+    }
+
+Plan: 5 to add, 1 to change, 0 to destroy.
+
+...
+
+aws_lambda_function.submission: Modifications complete after 11s [id=Submission]
 ```
