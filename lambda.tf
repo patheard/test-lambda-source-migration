@@ -1,29 +1,28 @@
-data "archive_file" "submission_main" {
+data "archive_file" "submission_code" {
   type        = "zip"
-  source_file = "lambda/submission/submission.js"
-  output_path = "/tmp/submission_main.zip"
+  source_dir  = "./code/submission/dist"
+  output_path = "/tmp/submission_code.zip"
 }
 
-data "archive_file" "submission_lib" {
-  type        = "zip"
-  source_dir  = "lambda/submission/"
-  excludes    = ["submission.js"]
-  output_path = "/tmp/submission_lib.zip"
+resource "aws_s3_object" "submission_code" {
+  bucket      = aws_s3_bucket.lambda_code.id
+  key         = "submission_code"
+  source      = data.archive_file.submission_code.output_path
+  source_hash = data.archive_file.submission_code.output_base64sha256
 }
 
 resource "aws_lambda_function" "submission" {
-  filename      = "/tmp/submission_main.zip"
-  function_name = "Submission"
-  role          = aws_iam_role.lambda.arn
-  handler       = "submission.handler"
-  timeout       = 60
+  s3_bucket         = aws_s3_object.submission_code.bucket
+  s3_key            = aws_s3_object.submission_code.key
+  s3_object_version = aws_s3_object.submission_code.version_id
+  function_name     = "Submission"
+  role              = aws_iam_role.lambda.arn
+  handler           = "submission.handler"
+  timeout           = 60
 
-  source_code_hash = data.archive_file.submission_main.output_base64sha256
+  source_code_hash = data.archive_file.submission_code.output_base64sha256
 
   runtime = "nodejs18.x"
-  layers = [
-    aws_lambda_layer_version.submission_lib.arn
-  ]
 
   environment {
     variables = {
@@ -35,13 +34,6 @@ resource "aws_lambda_function" "submission" {
   tracing_config {
     mode = "PassThrough"
   }
-}
-
-resource "aws_lambda_layer_version" "submission_lib" {
-  filename            = "/tmp/submission_lib.zip"
-  layer_name          = "submission_node_packages"
-  source_code_hash    = data.archive_file.submission_lib.output_base64sha256
-  compatible_runtimes = ["nodejs18.x"]
 }
 
 resource "aws_cloudwatch_log_group" "submission" {

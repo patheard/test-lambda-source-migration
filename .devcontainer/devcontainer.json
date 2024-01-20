@@ -11,7 +11,8 @@
 		"terraform": {
 			"version": "1.6.6",
 			"tflint": "none"
-		},		
+		},
+		"ghcr.io/devcontainers/features/node:1": {}		
 	},
 	"customizations": {
 		"vscode": {
